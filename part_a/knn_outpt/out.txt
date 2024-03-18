@@ -1,0 +1,19 @@
+Sparse matrix:
+[[nan nan nan ... nan nan nan]
+ [nan  0. nan ... nan nan nan]
+ [nan nan  1. ... nan nan nan]
+ ...
+ [nan nan nan ... nan nan nan]
+ [nan nan nan ... nan nan nan]
+ [nan nan nan ... nan nan nan]]
+Shape of sparse matrix:
+(542, 1774)
+Validation Accuracy: 0.6244707874682472
+Validation Accuracy: 0.6780976573525261
+Validation Accuracy: 0.6895286480383855
+Validation Accuracy: 0.6755574372001129
+Validation Accuracy: 0.6692068868190799
+Validation Accuracy: 0.6522720858029918
+Validation Accuracy: 0.6841659610499576
+k value selected: 11
+Test accuracy with best k: 0.6841659610499576
