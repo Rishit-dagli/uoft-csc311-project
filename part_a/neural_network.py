@@ -11,7 +11,7 @@ import torch
 
 
 def load_data(base_path="../data"):
-    """ Load the data in PyTorch Tensor.
+    """Load the data in PyTorch Tensor.
 
     :return: (zero_train_matrix, train_data, valid_data, test_data)
         WHERE:
@@ -39,7 +39,7 @@ def load_data(base_path="../data"):
 
 class AutoEncoder(nn.Module):
     def __init__(self, num_question, k=100):
-        """ Initialize a class AutoEncoder.
+        """Initialize a class AutoEncoder.
 
         :param num_question: int
         :param k: int
@@ -51,7 +51,7 @@ class AutoEncoder(nn.Module):
         self.h = nn.Linear(k, num_question)
 
     def get_weight_norm(self):
-        """ Return ||W^1||^2 + ||W^2||^2.
+        """Return ||W^1||^2 + ||W^2||^2.
 
         :return: float
         """
@@ -60,7 +60,7 @@ class AutoEncoder(nn.Module):
         return g_w_norm + h_w_norm
 
     def forward(self, inputs):
-        """ Return a forward pass given inputs.
+        """Return a forward pass given inputs.
 
         :param inputs: user vector.
         :return: user vector.
@@ -70,7 +70,8 @@ class AutoEncoder(nn.Module):
         # Implement the function as described in the docstring.             #
         # Use sigmoid activations for f and g.                              #
         #####################################################################
-        out = inputs
+        x = torch.sigmoid(self.g(inputs))
+        out = torch.sigmoid(self.h(x))
         #####################################################################
         #                       END OF YOUR CODE                            #
         #####################################################################
@@ -78,7 +79,7 @@ class AutoEncoder(nn.Module):
 
 
 def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
-    """ Train the neural network, where the objective also includes
+    """Train the neural network, where the objective also includes
     a regularizer.
 
     :param model: Module
@@ -90,8 +91,8 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     :param num_epoch: int
     :return: None
     """
-    # TODO: Add a regularizer to the cost function. 
-    
+    # TODO: Add a regularizer to the cost function.
+
     # Tell PyTorch you are training the model.
     model.train()
 
@@ -100,7 +101,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     num_student = train_data.shape[0]
 
     for epoch in range(0, num_epoch):
-        train_loss = 0.
+        train_loss = 0.0
 
         for user_id in range(num_student):
             inputs = Variable(zero_train_data[user_id]).unsqueeze(0)
@@ -109,26 +110,30 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             optimizer.zero_grad()
             output = model(inputs)
 
+            reg_term = lamb * model.get_weight_norm()
+
             # Mask the target to only compute the gradient of valid entries.
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
-            target[0][nan_mask] = output[0][nan_mask]
+            target[0].unsqueeze(0)[nan_mask] = output[0].unsqueeze(0)[nan_mask]
 
-            loss = torch.sum((output - target) ** 2.)
+            loss = torch.sum((output - target) ** 2.0 + reg_term)
             loss.backward()
 
             train_loss += loss.item()
             optimizer.step()
 
         valid_acc = evaluate(model, zero_train_data, valid_data)
-        print("Epoch: {} \tTraining Cost: {:.6f}\t "
-              "Valid Acc: {}".format(epoch, train_loss, valid_acc))
+        print(
+            "Epoch: {} \tTraining Cost: {:.6f}\t "
+            "Valid Acc: {}".format(epoch, train_loss, valid_acc)
+        )
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
 
 
 def evaluate(model, train_data, valid_data):
-    """ Evaluate the valid_data on the current model.
+    """Evaluate the valid_data on the current model.
 
     :param model: Module
     :param train_data: 2D FloatTensor
@@ -161,17 +166,55 @@ def main():
     # Try out 5 different k and select the best k using the             #
     # validation set.                                                   #
     #####################################################################
-    # Set model hyperparameters.
-    k = None
-    model = None
 
-    # Set optimization hyperparameters.
-    lr = None
-    num_epoch = None
-    lamb = None
+    # Possible values of hyperparameters to try
+    k_values = [10, 50, 100, 200, 500]
+    lr_values = [0.001, 0.01, 0.05]
+    epoch_values = [10, 20, 30]
+    lamb = 0.001
 
-    train(model, lr, lamb, train_matrix, zero_train_matrix,
-          valid_data, num_epoch)
+    best_config = {
+        "k": k_values[0],
+        "lr": lr_values[0],
+        "epochs": epoch_values[0],
+        "valid_acc": -float("inf"),
+    }
+
+    for k in k_values:
+        for lr in lr_values:
+            for num_epoch in epoch_values:
+                print(f"Training with k={k}, lr={lr}, epochs={num_epoch}")
+
+                # Initialize model
+                model = AutoEncoder(num_question=train_matrix.shape[1], k=k)
+
+                # Train the model
+                train(
+                    model,
+                    lr,
+                    lamb,
+                    train_matrix,
+                    zero_train_matrix,
+                    valid_data,
+                    num_epoch,
+                )
+
+                # Evaluate the model on the validation set
+                valid_acc = evaluate(
+                    model, zero_train_matrix, valid_data
+                )  # Assume this function is implemented
+
+                print(f"Validation accuracy: {valid_acc}")
+
+                # Update the best configuration if the current model is better
+                if valid_acc > best_config["valid_acc"]:
+                    best_config.update(
+                        {"k": k, "lr": lr, "epochs": num_epoch, "valid_acc": valid_acc}
+                    )
+
+    print(
+        f"Best configuration: k={best_config['k']}, lr={best_config['lr']}, epochs={best_config['epochs']} with validation accuracy: {best_config['valid_acc']}"
+    )
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
