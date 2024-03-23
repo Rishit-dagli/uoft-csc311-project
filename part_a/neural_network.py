@@ -6,6 +6,8 @@ import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data
 
+import matplotlib.pyplot as plt
+
 import numpy as np
 import torch
 
@@ -78,7 +80,9 @@ class AutoEncoder(nn.Module):
         return out
 
 
-def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
+def train(
+    model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch, verbose=False
+):
     """Train the neural network, where the objective also includes
     a regularizer.
 
@@ -100,8 +104,14 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     optimizer = optim.SGD(model.parameters(), lr=lr)
     num_student = train_data.shape[0]
 
+    validation_accuracy = []
+    training_loss = []
+    validation_loss = []
+
     for epoch in range(0, num_epoch):
         train_loss = 0.0
+        correct = 0.0
+        total = 0.0
 
         for user_id in range(num_student):
             inputs = Variable(zero_train_data[user_id]).unsqueeze(0)
@@ -123,10 +133,24 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             optimizer.step()
 
         valid_acc = evaluate(model, zero_train_data, valid_data)
-        print(
-            "Epoch: {} \tTraining Cost: {:.6f}\t "
-            "Valid Acc: {}".format(epoch, train_loss, valid_acc)
-        )
+
+        model.eval()
+        valid_loss = 0.0
+        for i, u in enumerate(valid_data["user_id"]):
+            inputs = Variable(zero_train_data[u]).unsqueeze(0)
+            output = model(inputs)
+            guess = output[0][valid_data["question_id"][i]].item()
+            valid_loss += (guess - valid_data["is_correct"][i]) ** 2
+
+        if verbose:
+            print(
+                "Epoch: {} \tTraining Cost: {:.6f}\t "
+                "Valid Acc: {}".format(epoch, train_loss, valid_acc)
+            )
+        training_loss.append(train_loss)
+        validation_loss.append(valid_loss)
+        validation_accuracy.append(valid_acc)
+    return training_loss, validation_loss, validation_accuracy
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -167,11 +191,13 @@ def main():
     # validation set.                                                   #
     #####################################################################
 
-    # Possible values of hyperparameters to try
+    print("Start hyperparameter tuning for part (b).")
+    print()
+
     k_values = [10, 50, 100, 200, 500]
-    lr_values = [0.001, 0.01, 0.05]
-    epoch_values = [10, 20, 30]
-    lamb = 0.001
+    lr_values = [0.01, 0.03, 0.05]
+    epoch_values = [10, 20]
+    lamb = 0.0
 
     best_config = {
         "k": k_values[0],
@@ -199,9 +225,7 @@ def main():
                     num_epoch,
                 )
 
-                valid_acc = evaluate(
-                    model, zero_train_matrix, valid_data
-                )
+                valid_acc = evaluate(model, zero_train_matrix, valid_data)
 
                 # print(f"Validation accuracy: {valid_acc}")
 
@@ -212,6 +236,81 @@ def main():
 
     print(
         f"Best configuration: k={best_config['k']}, lr={best_config['lr']}, epochs={best_config['epochs']} with validation accuracy: {best_config['valid_acc']}"
+    )
+
+    print()
+    print("Start part (c)")
+    print()
+
+    N_valid = np.count_nonzero(valid_data["is_correct"])
+    N_train = np.count_nonzero(zero_train_matrix)
+
+    model = AutoEncoder(num_question=train_matrix.shape[1], k=best_config["k"])
+    lamb = 0.0
+    train_losses, valid_losses, valid_acc = train(
+        model,
+        best_config["lr"],
+        lamb,
+        train_matrix,
+        zero_train_matrix,
+        valid_data,
+        best_config["epochs"],
+    )
+
+    test_accuracy = evaluate(model, zero_train_matrix, test_data)
+    print(f"Test accuracy: {test_accuracy}")
+
+    epochs = range(1, len(train_losses) + 1)
+    plt.figure()
+    plt.plot(epochs, np.array(train_losses) / N_train, label="Training loss")
+    plt.plot(epochs, np.array(valid_losses) / N_valid, label="Validation loss")
+    plt.title("Training and Validation Loss")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.savefig("part3c.png")
+
+    print("Start hyperparameter tuning for part (d)")
+    print()
+
+    lamb = [1e-3, 1e-2, 1e-1, 1]
+    best_config_l = {
+        "lamb": lamb[0],
+        "valid_acc": -float("inf"),
+    }
+
+    for l in lamb:
+        print(f"Training with lambda={l}")
+
+        model = AutoEncoder(num_question=train_matrix.shape[1], k=best_config["k"])
+        train(
+            model,
+            best_config["lr"],
+            l,
+            train_matrix,
+            zero_train_matrix,
+            valid_data,
+            best_config["epochs"],
+        )
+
+        valid_acc = evaluate(model, zero_train_matrix, valid_data)
+
+        if valid_acc > best_config_l["valid_acc"]:
+            best_config_l.update({"lamb": l, "valid_acc": valid_acc})
+
+    model = AutoEncoder(num_question=train_matrix.shape[1], k=best_config["k"])
+    train(
+        model,
+        best_config["lr"],
+        best_config_l["lamb"],
+        train_matrix,
+        zero_train_matrix,
+        valid_data,
+        best_config["epochs"],
+    )
+    test_accuracy = evaluate(model, zero_train_matrix, test_data)
+    print(
+        f"Best configuration: k={best_config['k']}, lr={best_config['lr']}, epochs={best_config['epochs']}, lambda={best_config_l['lamb']} with validation accuracy: {best_config_l['valid_acc']} and test accuracy: {test_accuracy}"
     )
     #####################################################################
     #                       END OF YOUR CODE                            #
