@@ -199,14 +199,12 @@ def main():
                     num_epoch,
                 )
 
-                # Evaluate the model on the validation set
                 valid_acc = evaluate(
                     model, zero_train_matrix, valid_data
-                )  # Assume this function is implemented
+                )
 
-                print(f"Validation accuracy: {valid_acc}")
+                # print(f"Validation accuracy: {valid_acc}")
 
-                # Update the best configuration if the current model is better
                 if valid_acc > best_config["valid_acc"]:
                     best_config.update(
                         {"k": k, "lr": lr, "epochs": num_epoch, "valid_acc": valid_acc}
