@@ -120,7 +120,7 @@ def train(
             optimizer.zero_grad()
             output = model(inputs)
 
-            reg_term = lamb * model.get_weight_norm()
+            reg_term = 0.5 * lamb * model.get_weight_norm()
 
             # Mask the target to only compute the gradient of valid entries.
             nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
