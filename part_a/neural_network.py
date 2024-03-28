@@ -1,3 +1,5 @@
+from matplotlib import pyplot as plt
+
 from utils import *
 from torch.autograd import Variable
 
@@ -8,7 +10,7 @@ import torch.utils.data
 
 import numpy as np
 import torch
-from scipy.sparse import hstack, csr_matrix
+from scipy.sparse import *
 
 
 def load_data(base_path="../data"):
@@ -35,6 +37,7 @@ def load_data(base_path="../data"):
     zero_train_matrix = torch.FloatTensor(zero_train_matrix)
     train_matrix = torch.FloatTensor(train_matrix)
 
+
     student_meta = pd.read_csv(os.path.join(base_path, 'student_meta_clean.csv'))
     question_meta = pd.read_csv(os.path.join(base_path, 'question_meta.csv'))
     subject_meta = pd.read_csv(os.path.join(base_path, 'subject_meta.csv'))
@@ -42,6 +45,20 @@ def load_data(base_path="../data"):
     student_meta_cleaned = process_student_metadata(student_meta)
     question_meta_cleaned = process_question_metadata(question_meta, subject_meta)
 
+    train_data = load_train_csv(base_path)
+
+    combined_train_matrix = combine_metadata_with_sparse_data(train_matrix,
+                                                 student_meta_cleaned,
+                                                 question_meta_cleaned,
+                                                 list(set(train_data['user_id'])),
+                                                 list(set(train_data['question_id'])))
+
+    zero_train_matrix = combined_train_matrix.copy()
+    # Fill in the missing entries to 0.
+    zero_train_matrix[np.isnan(train_matrix)] = 0
+    # Change to Float Tensor for PyTorch.
+    zero_train_matrix = torch.FloatTensor(zero_train_matrix)
+    train_matrix = torch.FloatTensor(combined_train_matrix)
     return zero_train_matrix, train_matrix, valid_data, test_data
 
 def combine_metadata_with_sparse_data(sparse_data, student_meta, question_meta, user_ids, question_ids):
@@ -60,10 +77,27 @@ def combine_metadata_with_sparse_data(sparse_data, student_meta, question_meta, 
     question_sparse = csr_matrix(question_meta.loc[question_ids].values)
 
     # Append metadata to the sparse data
-    combined_sparse_data = hstack([sparse_data, student_sparse, question_sparse])
+    combined_sparse_data = hstack([sparse_data, question_sparse.transpose()])
+    combined_sparse_data = vstack([combined_sparse_data, student_sparse])
 
     return combined_sparse_data
 
+def combine_data_with_metadata(data_df, student_meta_df, question_meta_df):
+    """
+    Combine the data DataFrame with student and question metadata.
+
+    :param data_df: DataFrame with user_id, question_id (and possibly is_correct).
+    :param student_meta_df: DataFrame containing processed student metadata.
+    :param question_meta_df: DataFrame containing processed question metadata.
+    :return: Combined DataFrame.
+    """
+    # Merge with student metadata
+    combined_df = data_df.merge(student_meta_df, on="user_id", how="left")
+
+    # Merge with question metadata
+    combined_df = combined_df.merge(question_meta_df, on="question_id", how="left")
+
+    return combined_df
 
 class AutoEncoder(nn.Module):
     def __init__(self, num_question, k=100):
@@ -189,17 +223,13 @@ def evaluate(model, train_data, valid_data):
 def main():
     zero_train_matrix, train_matrix, valid_data, test_data = load_data()
 
-    #####################################################################
-    # TODO:                                                             #
-    # Try out 5 different k and select the best k using the             #
-    # validation set.                                                   #
-    #####################################################################
+    print("Start hyperparameter tuning for part (b).")
+    print()
 
-    # Possible values of hyperparameters to try
     k_values = [10, 50, 100, 200, 500]
-    lr_values = [0.001, 0.01, 0.05]
-    epoch_values = [10, 20, 30]
-    lamb = 0.001
+    lr_values = [0.01, 0.03, 0.05]
+    epoch_values = [10, 20]
+    lamb = 0.0
 
     best_config = {
         "k": k_values[0],
@@ -227,26 +257,94 @@ def main():
                     num_epoch,
                 )
 
-                # Evaluate the model on the validation set
-                valid_acc = evaluate(
-                    model, zero_train_matrix, valid_data
-                )  # Assume this function is implemented
+                valid_acc = evaluate(model, zero_train_matrix, valid_data)
 
-                print(f"Validation accuracy: {valid_acc}")
+                # print(f"Validation accuracy: {valid_acc}")
 
-                # Update the best configuration if the current model is better
                 if valid_acc > best_config["valid_acc"]:
                     best_config.update(
-                        {"k": k, "lr": lr, "epochs": num_epoch, "valid_acc": valid_acc}
+                        {"k": k, "lr": lr, "epochs": num_epoch,
+                         "valid_acc": valid_acc}
                     )
 
     print(
         f"Best configuration: k={best_config['k']}, lr={best_config['lr']}, epochs={best_config['epochs']} with validation accuracy: {best_config['valid_acc']}"
     )
-    #####################################################################
-    #                       END OF YOUR CODE                            #
-    #####################################################################
 
+    print()
+    print("Start part (c)")
+    print()
 
+    N_valid = np.count_nonzero(valid_data["is_correct"])
+    N_train = np.count_nonzero(zero_train_matrix)
+
+    model = AutoEncoder(num_question=train_matrix.shape[1], k=best_config["k"])
+    lamb = 0.0
+    train_losses, valid_losses, valid_acc = train(
+        model,
+        best_config["lr"],
+        lamb,
+        train_matrix,
+        zero_train_matrix,
+        valid_data,
+        best_config["epochs"],
+    )
+
+    test_accuracy = evaluate(model, zero_train_matrix, test_data)
+    print(f"Test accuracy: {test_accuracy}")
+
+    epochs = range(1, len(train_losses) + 1)
+    plt.figure()
+    plt.plot(epochs, np.array(train_losses) / N_train, label="Training loss")
+    plt.plot(epochs, np.array(valid_losses) / N_valid, label="Validation loss")
+    plt.title("Training and Validation Loss")
+    plt.xlabel("Epochs")
+    plt.ylabel("Loss")
+    plt.legend()
+    plt.savefig("part3c.png")
+
+    print("Start hyperparameter tuning for part (d)")
+    print()
+
+    lamb = [1e-3, 1e-2, 1e-1, 1]
+    best_config_l = {
+        "lamb": lamb[0],
+        "valid_acc": -float("inf"),
+    }
+
+    for l in lamb:
+        print(f"Training with lambda={l}")
+
+        model = AutoEncoder(num_question=train_matrix.shape[1],
+                            k=best_config["k"])
+        train(
+            model,
+            best_config["lr"],
+            l,
+            train_matrix,
+            zero_train_matrix,
+            valid_data,
+            best_config["epochs"],
+        )
+
+        valid_acc = evaluate(model, zero_train_matrix, valid_data)
+
+        if valid_acc > best_config_l["valid_acc"]:
+            best_config_l.update({"lamb": l, "valid_acc": valid_acc})
+
+    model = AutoEncoder(num_question=train_matrix.shape[1], k=best_config["k"])
+    train(
+        model,
+        best_config["lr"],
+        best_config_l["lamb"],
+        train_matrix,
+        zero_train_matrix,
+        valid_data,
+        best_config["epochs"],
+    )
+    test_accuracy = evaluate(model, zero_train_matrix, test_data)
+    print(
+        f"Best configuration: k={best_config['k']}, lr={best_config['lr']}, epochs={best_config['epochs']}, lambda={best_config_l['lamb']} with validation accuracy: {best_config_l['valid_acc']} and test accuracy: {test_accuracy}"
+    )
 if __name__ == "__main__":
     main()

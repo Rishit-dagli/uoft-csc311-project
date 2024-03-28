@@ -22,8 +22,11 @@ def process_student_metadata(student_meta_df):
 
     # One-Hot Encode Gender
     # Assuming gender categories are 0 (N/A), 1, 2, etc.
-    gender_dummies = pd.get_dummies(student_meta_df['gender'], prefix='gender')
-    student_meta_df = pd.concat([student_meta_df, gender_dummies], axis=1)
+    gender_categories = student_meta_df['gender'].unique()
+    for gender in gender_categories:
+        column_name = f'gender_{gender}'
+        student_meta_df[column_name] = (
+                    student_meta_df['gender'] == gender).astype(int)
 
     # Drop original gender column
     student_meta_df = student_meta_df.drop('gender', axis=1)
@@ -118,6 +121,40 @@ def load_train_csv(root_dir="/data"):
     path = os.path.join(root_dir, "train_data.csv")
     return _load_csv(path)
 
+def load_train_csv_df(root_dir="/data"):
+    """ Load the training data as a pandas DataFrame.
+
+
+    :param root_dir: str
+    :return: A pandas DataFrame
+    """
+    path = os.path.join(root_dir, "train_data.csv")
+    return pd.read_csv(path, usecols=['user_id', 'question_id', 'is_correct'])
+
+def load_train_csv_to_df(path):
+    """
+    Load training data from a CSV file into a Pandas DataFrame.
+
+    :param path: The path to the training CSV file.
+    :return: A DataFrame containing the training data.
+    """
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"The training data file at {path} does not exist.")
+
+    return pd.read_csv(path, usecols=["user_id", "question_id", "is_correct"])
+
+
+def load_valid_csv_to_df(path):
+    """
+    Load validation data from a CSV file into a Pandas DataFrame.
+
+    :param path: The path to the validation CSV file.
+    :return: A DataFrame containing the validation data.
+    """
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"The validation data file at {path} does not exist.")
+
+    return pd.read_csv(path, usecols=["user_id", "question_id", "is_correct"])
 
 def load_valid_csv(root_dir="/data"):
     """ Load the validation data as a dictionary.
