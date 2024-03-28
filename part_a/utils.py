@@ -1,8 +1,66 @@
 from scipy.sparse import load_npz
 
 import numpy as np
+import pandas as pd
 import csv
 import os
+
+def process_student_metadata(student_meta_df):
+    """
+    Process the student metadata DataFrame.
+
+    :param student_meta_df: Pandas DataFrame containing student metadata
+    :return: Processed DataFrame
+    """
+    # Handle missing values in age
+    # Assuming NaN or values <= 7 are to be treated as a separate category
+    student_meta_df['age'] = student_meta_df['age'].apply(lambda x: -1 if pd.isna(x) or x <= 7 else x)
+
+    # Normalize age - Simple normalization to range 0-1
+    max_age = student_meta_df['age'].max()
+    student_meta_df['age'] = student_meta_df['age'] / max_age
+
+    # One-Hot Encode Gender
+    # Assuming gender categories are 0 (N/A), 1, 2, etc.
+    gender_dummies = pd.get_dummies(student_meta_df['gender'], prefix='gender')
+    student_meta_df = pd.concat([student_meta_df, gender_dummies], axis=1)
+
+    # Drop original gender column
+    student_meta_df = student_meta_df.drop('gender', axis=1)
+
+    return student_meta_df
+
+
+def process_question_metadata(question_meta_df, subject_meta_df):
+    """
+    Process the question metadata DataFrame.
+
+    :param question_meta_df: Pandas DataFrame containing question metadata.
+    :param subject_meta_df: Pandas DataFrame containing subject metadata.
+    :return: Processed DataFrame
+    """
+    import ast
+
+
+    # Convert subject_id list (stored as string) to actual list
+    question_meta_df['subject_id'] = question_meta_df['subject_id'].apply(ast.literal_eval)
+
+    # Map subject_id to subject names
+    subject_id_to_name = dict(zip(subject_meta_df['subject_id'], subject_meta_df['name']))
+    question_meta_df['subjects'] = question_meta_df['subject_id'].apply(lambda ids: [subject_id_to_name[id] for id in ids])
+
+    # One-Hot Encode the subjects
+    # Flatten the list of subjects and get unique subject names
+    all_subjects = sorted(set([subject for sublist in question_meta_df['subjects'] for subject in sublist]))
+
+    # Create one-hot encoded columns for each subject
+    for subject in all_subjects:
+        question_meta_df[f'subject_{subject}'] = question_meta_df['subjects'].apply(lambda x: int(subject in x))
+
+    # Drop the original subject_id and subjects columns
+    question_meta_df.drop(['subject_id', 'subjects'], axis=1, inplace=True)
+
+    return question_meta_df
 
 
 def _load_csv(path):

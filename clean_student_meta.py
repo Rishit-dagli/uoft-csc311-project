@@ -2,7 +2,7 @@ import pandas as pd
 from datetime import datetime
 
 # Load student_meta.csv
-df = pd.read_csv("/Users/shivesh/Downloads/project-starter-files-praka150/data/student_meta.csv")
+df = pd.read_csv("/Users/datkieu/PycharmProjects/csc311-project/data/student_meta.csv")
 
 # Fill missing gender with most common value
 most_common_gender = df['gender'].mode()[0]
@@ -20,4 +20,4 @@ most_common_premium_pupil = df['premium_pupil'].mode()[0]
 df['premium_pupil'] = df['premium_pupil'].fillna(most_common_premium_pupil)
 
 # Save to student_meta_clean.csv
-df[['user_id', 'gender', 'age', 'premium_pupil']].to_csv("/Users/shivesh/Downloads/project-starter-files-praka150/data/student_meta_clean.csv", index=False)
+df[['user_id', 'gender', 'age', 'premium_pupil']].to_csv("/Users/datkieu/PycharmProjects/csc311-project/data/student_meta_clean.csv", index=False)
