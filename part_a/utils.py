@@ -1,9 +1,35 @@
-from scipy.sparse import load_npz
+from scipy.sparse import csc_matrix, load_npz
 
 import numpy as np
 import pandas as pd
 import csv
 import os
+from scipy.sparse import csr_matrix
+
+
+def data_df_to_sparse(df):
+    """ Convert the data (train, valid) from DataFrame to sparse matrix."""
+    user_id_map = {user_id: index for index, user_id in
+                   enumerate(df['user_id'].unique())}
+
+    # Create a dictionary to map question IDs to column indices
+    question_id_map = {question_id: index for index, question_id in
+                       enumerate(df['question_id'].unique())}
+
+    # Create the data, row indices, and column indices for the sparse matrix
+    data = df['is_correct'].tolist()
+    row_indices = [user_id_map[user_id] for user_id in df['user_id']]
+    col_indices = [question_id_map[question_id] for question_id in
+                   df['question_id']]
+
+    # Create the sparse matrix
+    num_students = len(user_id_map)
+    num_questions = len(question_id_map)
+    sparse_matrix = csc_matrix((data, (row_indices, col_indices)),
+                               shape=(num_students, num_questions))
+
+    return sparse_matrix
+
 
 def process_student_metadata(student_meta_df):
     """
@@ -28,6 +54,8 @@ def process_student_metadata(student_meta_df):
         student_meta_df[column_name] = (
                     student_meta_df['gender'] == gender).astype(int)
 
+    #change column premium pupil float64 to int
+    student_meta_df['premium_pupil'] = student_meta_df['premium_pupil'].astype(int)
     # Drop original gender column
     student_meta_df = student_meta_df.drop('gender', axis=1)
 

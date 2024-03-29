@@ -3,6 +3,7 @@ from scipy.sparse import csr_matrix
 from collections import Counter
 
 from part_a.utils import *
+from part_a.neural_network import *
 
 
 def test_train_data_alignment():
@@ -51,11 +52,22 @@ def test_metadata_types():
     student_meta_cleaned = process_student_metadata(student_meta)
     question_meta_cleaned = process_question_metadata(question_meta,
                                                       subject_meta)
-
     print(student_meta_cleaned.dtypes)
     print(question_meta_cleaned.dtypes)
-    print(student_meta_cleaned.head())
-    print(question_meta_cleaned[0:2])
+    print(question_meta_cleaned.shape)
+    print(student_meta_cleaned.shape)
+
+    train_data = load_train_csv_df(base_path)
+
+    train_matrix = load_train_sparse(base_path)
+    test_data = load_public_test_csv_to_df(base_path)
+    valid_data = load_valid_csv_to_df(base_path)
+    print(train_data.shape)
+    print(data_df_to_sparse(train_data).shape)
+    print(train_matrix.shape)
+    # Check if the columns are of the correct type
+    print(combine_metadata(train_data, student_meta_cleaned, question_meta_cleaned).shape)
+    print(combine_metadata(train_data, student_meta_cleaned, question_meta_cleaned).dtypes)
 
 
 # how many unique values in question_meta, of subject_id
