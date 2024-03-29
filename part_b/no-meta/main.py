@@ -219,8 +219,8 @@ class QuestionUserModel(pl.LightningModule):
         loss = self.loss_fn(predictions, labels)
         preds = torch.sigmoid(predictions)
         self.log("test_loss", loss, on_step=False, on_epoch=True, prog_bar=True)
-        # np.savez("test_preds.npz", preds=preds.detach().cpu().numpy())
-        # np.savez("test_labels.npz", labels=labels.detach().cpu().numpy())
+        np.savez("test_preds.npz", preds=preds.detach().cpu().numpy())
+        np.savez("test_labels.npz", labels=labels.detach().cpu().numpy())
         self.accuracy(preds, labels.int())
         self.log("test_acc", self.accuracy, on_step=False, on_epoch=True, prog_bar=True)
         return loss
