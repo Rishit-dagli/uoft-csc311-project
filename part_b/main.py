@@ -160,7 +160,10 @@ class QuestionUserModel(pl.LightningModule):
         if self.optimizer == "adam":
             optimizer = Adam(self.parameters(), lr=1e-3)
         elif self.optimizer == "lion":
-            optimizer = Lion(self.parameters(), lr=1e-3, weight_decay=1e-2, use_triton=True)
+            if torch.cuda.is_available():
+                optimizer = Lion(self.parameters(), lr=1e-3, weight_decay=1e-2, use_triton=True)
+            else:
+                optimizer = Lion(self.parameters(), lr=1e-3, weight_decay=1e-2)
         elif self.optimizer == "sgd":
             optimizer = torch.optim.SGD(self.parameters(), lr=1e-2, momentum=0.9)
         elif self.optimizer == "rmsprop":
