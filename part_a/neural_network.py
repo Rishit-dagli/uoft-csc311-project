@@ -4,8 +4,6 @@ from utils import *
 from torch.autograd import Variable
 
 import torch.nn as nn
-import torch.nn.functional as F
-import torch.optim as optim
 import torch.utils.data
 
 import numpy as np
@@ -26,91 +24,86 @@ def load_data(base_path="../data"):
         test_data: A dictionary {user_id: list,
         user_id: list, is_correct: list}
     """
-    train_matrix = load_train_sparse(base_path).toarray()
-    valid_data = load_valid_csv(base_path)
-    test_data = load_public_test_csv(base_path)
 
-    zero_train_matrix = train_matrix.copy()
-    # Fill in the missing entries to 0.
-    zero_train_matrix[np.isnan(train_matrix)] = 0
-    # Change to Float Tensor for PyTorch.
-    zero_train_matrix = torch.FloatTensor(zero_train_matrix)
-    train_matrix = torch.FloatTensor(train_matrix)
+    valid_data = load_valid_csv_to_df(base_path)
+    test_data = load_public_test_csv_to_df(base_path)
 
-
-    student_meta = pd.read_csv(os.path.join(base_path, 'student_meta_clean.csv'))
+    student_meta = pd.read_csv(
+        os.path.join(base_path, 'student_meta_clean.csv'))
     question_meta = pd.read_csv(os.path.join(base_path, 'question_meta.csv'))
     subject_meta = pd.read_csv(os.path.join(base_path, 'subject_meta.csv'))
 
     student_meta_cleaned = process_student_metadata(student_meta)
-    question_meta_cleaned = process_question_metadata(question_meta, subject_meta)
+    question_meta_cleaned = process_question_metadata(question_meta,
+                                                      subject_meta)
 
-    train_data = load_train_csv(base_path)
+    train_data = load_train_csv_df(base_path)
 
-    combined_train_matrix = combine_metadata_with_sparse_data(train_matrix,
-                                                 student_meta_cleaned,
-                                                 question_meta_cleaned,
-                                                 list(set(train_data['user_id'])),
-                                                 list(set(train_data['question_id'])))
+    combined_train_matrix = combine_metadata(train_data,
+                                             student_meta_cleaned,
+                                             question_meta_cleaned,
+                                             sparse=True)
+
+    combined_valid = combine_metadata(valid_data,
+                                      student_meta_cleaned,
+                                      question_meta_cleaned)
+    combined_test = combine_metadata(test_data,
+                                     student_meta_cleaned,
+                                     question_meta_cleaned)
 
     zero_train_matrix = combined_train_matrix.copy()
     # Fill in the missing entries to 0.
-    zero_train_matrix[np.isnan(train_matrix)] = 0
+    zero_train_matrix[np.isnan(combined_train_matrix)] = 0
     # Change to Float Tensor for PyTorch.
     zero_train_matrix = torch.FloatTensor(zero_train_matrix)
     train_matrix = torch.FloatTensor(combined_train_matrix)
-    return zero_train_matrix, train_matrix, valid_data, test_data
 
-def combine_metadata_with_sparse_data(sparse_data, student_meta, question_meta, user_ids, question_ids):
+    # perf matrix is train_matrix without metadata
+    perf_matrix = load_train_sparse(base_path)
+    zero_perf_matrix = perf_matrix.copy()
+    zero_perf_matrix[np.isnan(perf_matrix)] = 0
+    zero_perf_matrix = torch.FloatTensor(zero_perf_matrix)
+    return (zero_train_matrix, train_matrix, valid_data,
+            test_data, zero_perf_matrix, perf_matrix)
+
+
+def combine_metadata(sparse_data, student_meta, question_meta, sparse=False):
     """
     Combine the student and question metadata with the given sparse dataset.
 
-    :param sparse_data: Sparse matrix representing the training data.
+    :param sparse_data: DF representing the training data.
     :param student_meta: DataFrame containing processed student metadata.
     :param question_meta: DataFrame containing processed question metadata.
-    :param user_ids: List or array of user IDs corresponding to the rows in sparse_data.
-    :param question_ids: List or array of question IDs corresponding to the columns in sparse_data.
     :return: Combined sparse dataset.
     """
     # Convert metadata DataFrames to sparse format
-    student_sparse = csr_matrix(student_meta.loc[user_ids].values)
-    question_sparse = csr_matrix(question_meta.loc[question_ids].values)
 
     # Append metadata to the sparse data
-    combined_sparse_data = hstack([sparse_data, question_sparse.transpose()])
-    combined_sparse_data = vstack([combined_sparse_data, student_sparse])
+    concatenated_student = pd.concat([sparse_data, student_meta], axis=0)
+    combined_sparse_data = pd.concat([concatenated_student, question_meta],
+                                     axis=1)
 
-    return combined_sparse_data
+    return csr_matrix(combined_sparse_data) if sparse else combined_sparse_data
 
-def combine_data_with_metadata(data_df, student_meta_df, question_meta_df):
-    """
-    Combine the data DataFrame with student and question metadata.
-
-    :param data_df: DataFrame with user_id, question_id (and possibly is_correct).
-    :param student_meta_df: DataFrame containing processed student metadata.
-    :param question_meta_df: DataFrame containing processed question metadata.
-    :return: Combined DataFrame.
-    """
-    # Merge with student metadata
-    combined_df = data_df.merge(student_meta_df, on="user_id", how="left")
-
-    # Merge with question metadata
-    combined_df = combined_df.merge(question_meta_df, on="question_id", how="left")
-
-    return combined_df
 
 class AutoEncoder(nn.Module):
-    def __init__(self, num_question, k=100):
+    def __init__(self, input_size, num_question, k=100):
         """Initialize a class AutoEncoder.
 
+        :param input_size: int
         :param num_question: int
         :param k: int
         """
         super(AutoEncoder, self).__init__()
 
-        # Define linear functions.
-        self.g = nn.Linear(num_question, k)
-        self.h = nn.Linear(k, num_question)
+        self.g = nn.Sequential(
+            nn.Linear(input_size, k),
+            nn.ReLU(),
+        )
+        self.h = nn.Sequential(
+            nn.Linear(k, num_question),
+            nn.ReLU(),
+        )
 
     def get_weight_norm(self):
         """Return ||W^1||^2 + ||W^2||^2.
@@ -121,26 +114,14 @@ class AutoEncoder(nn.Module):
         h_w_norm = torch.norm(self.h.weight, 2) ** 2
         return g_w_norm + h_w_norm
 
-    def forward(self, inputs):
-        """Return a forward pass given inputs.
-
-        :param inputs: user vector.
-        :return: user vector.
-        """
-        #####################################################################
-        # TODO:                                                             #
-        # Implement the function as described in the docstring.             #
-        # Use sigmoid activations for f and g.                              #
-        #####################################################################
-        x = torch.sigmoid(self.g(inputs))
-        out = torch.sigmoid(self.h(x))
-        #####################################################################
-        #                       END OF YOUR CODE                            #
-        #####################################################################
-        return out
+    def forward(self, x):
+        x = self.encoder(x)
+        x = self.decoder(x)
+        return x
 
 
-def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
+def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch,
+          zero_perf_matrix, perf_matrix):
     """Train the neural network, where the objective also includes
     a regularizer.
 
@@ -153,13 +134,12 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
     :param num_epoch: int
     :return: None
     """
-
-
     # Tell PyTorch you are training the model.
     model.train()
 
+    criterion = nn.MSELoss()
     # Define optimizers and loss function.
-    optimizer = optim.SGD(model.parameters(), lr=lr)
+    optimizer = torch.optim.Adam(model.parameters(), lr=lr)
     num_student = train_data.shape[0]
 
     for epoch in range(0, num_epoch):
@@ -167,18 +147,18 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
 
         for user_id in range(num_student):
             inputs = Variable(zero_train_data[user_id]).unsqueeze(0)
-            target = inputs.clone()
+            target = Variable(zero_perf_matrix[user_id]).unsqueeze(0)
 
             optimizer.zero_grad()
             output = model(inputs)
 
-            reg_term = lamb/2 * model.get_weight_norm()
+            reg_term = lamb / 2 * model.get_weight_norm()
 
             # Mask the target to only compute the gradient of valid entries.
-            nan_mask = np.isnan(train_data[user_id].unsqueeze(0).numpy())
+            nan_mask = np.isnan(perf_matrix[user_id].unsqueeze(0).numpy())
             target[0].unsqueeze(0)[nan_mask] = output[0].unsqueeze(0)[nan_mask]
 
-            loss = torch.sum((output - target) ** 2.0 + reg_term)
+            loss = criterion(output, target) + reg_term
             loss.backward()
 
             train_loss += loss.item()
@@ -189,6 +169,7 @@ def train(model, lr, lamb, train_data, zero_train_data, valid_data, num_epoch):
             "Epoch: {} \tTraining Cost: {:.6f}\t "
             "Valid Acc: {}".format(epoch, train_loss, valid_acc)
         )
+    return train_loss, valid_acc,
     #####################################################################
     #                       END OF YOUR CODE                            #
     #####################################################################
@@ -221,7 +202,7 @@ def evaluate(model, train_data, valid_data):
 
 
 def main():
-    zero_train_matrix, train_matrix, valid_data, test_data = load_data()
+    zero_train_matrix, train_matrix, valid_data, test_data, perf_matrix, zero_perf_matrix = load_data()
 
     print("Start hyperparameter tuning for part (b).")
     print()
@@ -244,7 +225,9 @@ def main():
                 print(f"Training with k={k}, lr={lr}, epochs={num_epoch}")
 
                 # Initialize model
-                model = AutoEncoder(num_question=train_matrix.shape[1], k=k)
+                model = AutoEncoder(input_size=train_matrix.shape[1],
+                                    num_question=perf_matrix.shape[1],
+                                    k=k)
 
                 # Train the model
                 train(
@@ -255,6 +238,8 @@ def main():
                     zero_train_matrix,
                     valid_data,
                     num_epoch,
+                    zero_perf_matrix,
+                    perf_matrix
                 )
 
                 valid_acc = evaluate(model, zero_train_matrix, valid_data)
@@ -278,7 +263,9 @@ def main():
     N_valid = np.count_nonzero(valid_data["is_correct"])
     N_train = np.count_nonzero(zero_train_matrix)
 
-    model = AutoEncoder(num_question=train_matrix.shape[1], k=best_config["k"])
+    model = AutoEncoder(input_size=train_matrix.shape[1],
+                        num_question=perf_matrix.shape[1],
+                        k=best_config["k"])
     lamb = 0.0
     train_losses, valid_losses, valid_acc = train(
         model,
@@ -288,6 +275,8 @@ def main():
         zero_train_matrix,
         valid_data,
         best_config["epochs"],
+        zero_perf_matrix,
+        perf_matrix
     )
 
     test_accuracy = evaluate(model, zero_train_matrix, test_data)
@@ -315,7 +304,7 @@ def main():
     for l in lamb:
         print(f"Training with lambda={l}")
 
-        model = AutoEncoder(num_question=train_matrix.shape[1],
+        model = AutoEncoder(input_size=train_matrix.shape[1], num_question=perf_matrix.shape[1],
                             k=best_config["k"])
         train(
             model,
@@ -325,6 +314,8 @@ def main():
             zero_train_matrix,
             valid_data,
             best_config["epochs"],
+            zero_perf_matrix,
+            perf_matrix
         )
 
         valid_acc = evaluate(model, zero_train_matrix, valid_data)
@@ -341,10 +332,14 @@ def main():
         zero_train_matrix,
         valid_data,
         best_config["epochs"],
+        zero_perf_matrix,
+        perf_matrix
     )
     test_accuracy = evaluate(model, zero_train_matrix, test_data)
     print(
         f"Best configuration: k={best_config['k']}, lr={best_config['lr']}, epochs={best_config['epochs']}, lambda={best_config_l['lamb']} with validation accuracy: {best_config_l['valid_acc']} and test accuracy: {test_accuracy}"
     )
+
+
 if __name__ == "__main__":
     main()

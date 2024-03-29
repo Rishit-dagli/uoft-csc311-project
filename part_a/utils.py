@@ -121,6 +121,7 @@ def load_train_csv(root_dir="/data"):
     path = os.path.join(root_dir, "train_data.csv")
     return _load_csv(path)
 
+
 def load_train_csv_df(root_dir="/data"):
     """ Load the training data as a pandas DataFrame.
 
@@ -131,28 +132,31 @@ def load_train_csv_df(root_dir="/data"):
     path = os.path.join(root_dir, "train_data.csv")
     return pd.read_csv(path, usecols=['user_id', 'question_id', 'is_correct'])
 
-def load_train_csv_to_df(path):
-    """
-    Load training data from a CSV file into a Pandas DataFrame.
 
-    :param path: The path to the training CSV file.
-    :return: A DataFrame containing the training data.
-    """
-    if not os.path.exists(path):
-        raise FileNotFoundError(f"The training data file at {path} does not exist.")
-
-    return pd.read_csv(path, usecols=["user_id", "question_id", "is_correct"])
-
-
-def load_valid_csv_to_df(path):
+def load_valid_csv_to_df(root_dir="/data"):
     """
     Load validation data from a CSV file into a Pandas DataFrame.
 
     :param path: The path to the validation CSV file.
     :return: A DataFrame containing the validation data.
     """
+    path = os.path.join(root_dir, "valid_data.csv")
     if not os.path.exists(path):
         raise FileNotFoundError(f"The validation data file at {path} does not exist.")
+
+    return pd.read_csv(path, usecols=["user_id", "question_id", "is_correct"])
+
+
+def load_public_test_csv_to_df(root_dir="/data"):
+    """
+    Load test data from a CSV file into a Pandas DataFrame.
+
+    :param path: The path to the test CSV file.
+    :return: A DataFrame containing the test data.
+    """
+    path = os.path.join(root_dir, "test_data.csv")
+    if not os.path.exists(path):
+        raise FileNotFoundError(f"The test data file at {path} does not exist.")
 
     return pd.read_csv(path, usecols=["user_id", "question_id", "is_correct"])
 
