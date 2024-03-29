@@ -1,0 +1,11 @@
+customloss: false
+embedding_dim: 16
+gamma: 0.1
+lr: 0.1
+lr_scheduler: none
+model_type: original
+num_questions: 1774
+num_users: 542
+optimizer: adamw
+patience: 10
+step_size: 10

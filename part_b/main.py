@@ -10,6 +10,7 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from torch import nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader, Dataset
+from lion_pytorch import Lion
 
 
 class Attention(nn.Module):
@@ -158,6 +159,8 @@ class QuestionUserModel(pl.LightningModule):
         optimizer = None
         if self.optimizer == "adam":
             optimizer = Adam(self.parameters(), lr=1e-3)
+        elif self.optimizer == "lion":
+            optimizer = Lion(self.parameters(), lr=1e-3, weight_decay=1e-2, use_triton=True)
         elif self.optimizer == "sgd":
             optimizer = torch.optim.SGD(self.parameters(), lr=1e-2, momentum=0.9)
         elif self.optimizer == "rmsprop":
