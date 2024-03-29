@@ -1,8 +1,8 @@
-from scipy.sparse import load_npz
-
-import numpy as np
 import csv
 import os
+
+import numpy as np
+from scipy.sparse import load_npz
 
 
 def _load_csv(path):
@@ -10,11 +10,7 @@ def _load_csv(path):
     if not os.path.exists(path):
         raise Exception("The specified path {} does not exist.".format(path))
     # Initialize the data.
-    data = {
-        "user_id": [],
-        "question_id": [],
-        "is_correct": []
-    }
+    data = {"user_id": [], "question_id": [], "is_correct": []}
     # Iterate over the row to fill in the data.
     with open(path, "r") as csv_file:
         reader = csv.reader(csv_file)
@@ -33,21 +29,22 @@ def _load_csv(path):
 
 
 def load_train_sparse(root_dir="/data"):
-    """ Load the training data as a spare matrix representation.
+    """Load the training data as a spare matrix representation.
 
     :param root_dir: str
     :return: 2D sparse matrix
     """
     path = os.path.join(root_dir, "train_sparse.npz")
     if not os.path.exists(path):
-        raise Exception("The specified path {} "
-                        "does not exist.".format(os.path.abspath(path)))
+        raise Exception(
+            "The specified path {} " "does not exist.".format(os.path.abspath(path))
+        )
     matrix = load_npz(path)
     return matrix
 
 
 def load_train_csv(root_dir="/data"):
-    """ Load the training data as a dictionary.
+    """Load the training data as a dictionary.
 
     :param root_dir: str
     :return: A dictionary {user_id: list, question_id: list, is_correct: list}
@@ -62,7 +59,7 @@ def load_train_csv(root_dir="/data"):
 
 
 def load_valid_csv(root_dir="/data"):
-    """ Load the validation data as a dictionary.
+    """Load the validation data as a dictionary.
 
     :param root_dir: str
     :return: A dictionary {user_id: list, question_id: list, is_correct: list}
@@ -77,7 +74,7 @@ def load_valid_csv(root_dir="/data"):
 
 
 def load_public_test_csv(root_dir="/data"):
-    """ Load the test data as a dictionary.
+    """Load the test data as a dictionary.
 
     :param root_dir: str
     :return: A dictionary {user_id: list, question_id: list, is_correct: list}
@@ -92,7 +89,7 @@ def load_public_test_csv(root_dir="/data"):
 
 
 def load_private_test_csv(root_dir="/data"):
-    """ Load the private test data as a dictionary.
+    """Load the private test data as a dictionary.
 
     :param root_dir: str
     :return: A dictionary {user_id: list, question_id: list, is_correct: list}
@@ -106,7 +103,7 @@ def load_private_test_csv(root_dir="/data"):
 
 
 def save_private_test_csv(data, file_name="private_test_result.csv"):
-    """ Save the private test data as a csv file.
+    """Save the private test data as a csv file.
 
     This should be your submission file to Kaggle.
     :param data: A dictionary {user_id: list, question_id: list, is_correct: list}
@@ -134,7 +131,7 @@ def save_private_test_csv(data, file_name="private_test_result.csv"):
 
 
 def evaluate(data, predictions, threshold=0.5):
-    """ Return the accuracy of the predictions given the data.
+    """Return the accuracy of the predictions given the data.
 
     :param data: A dictionary {user_id: list, question_id: list, is_correct: list}
     :param predictions: list
@@ -145,12 +142,13 @@ def evaluate(data, predictions, threshold=0.5):
         raise Exception("Mismatch of dimensions between data and prediction.")
     if isinstance(predictions, list):
         predictions = np.array(predictions).astype(np.float64)
-    return (np.sum((predictions >= threshold) == data["is_correct"])
-            / float(len(data["is_correct"])))
+    return np.sum((predictions >= threshold) == data["is_correct"]) / float(
+        len(data["is_correct"])
+    )
 
 
 def sparse_matrix_evaluate(data, matrix, threshold=0.5):
-    """ Given the sparse matrix represent, return the accuracy of the prediction on data.
+    """Given the sparse matrix represent, return the accuracy of the prediction on data.
 
     :param data: A dictionary {user_id: list, question_id: list, is_correct: list}
     :param matrix: 2D matrix
@@ -164,14 +162,17 @@ def sparse_matrix_evaluate(data, matrix, threshold=0.5):
         cur_question_id = data["question_id"][i]
         if matrix[cur_user_id, cur_question_id] >= threshold and data["is_correct"][i]:
             total_accurate += 1
-        if matrix[cur_user_id, cur_question_id] < threshold and not data["is_correct"][i]:
+        if (
+            matrix[cur_user_id, cur_question_id] < threshold
+            and not data["is_correct"][i]
+        ):
             total_accurate += 1
         total_prediction += 1
     return total_accurate / float(total_prediction)
 
 
 def sparse_matrix_predictions(data, matrix, threshold=0.5):
-    """ Given the sparse matrix represent, return the predictions.
+    """Given the sparse matrix represent, return the predictions.
 
     This function can be used for submitting Kaggle competition.
 
@@ -185,7 +186,7 @@ def sparse_matrix_predictions(data, matrix, threshold=0.5):
         cur_user_id = data["user_id"][i]
         cur_question_id = data["question_id"][i]
         if matrix[cur_user_id, cur_question_id] >= threshold:
-            predictions.append(1.)
+            predictions.append(1.0)
         else:
-            predictions.append(0.)
+            predictions.append(0.0)
     return predictions

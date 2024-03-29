@@ -1,5 +1,6 @@
 import argparse
 
+import numpy as np
 import pandas as pd
 import pytorch_lightning as pl
 import torch
@@ -9,7 +10,6 @@ from pytorch_lightning.loggers import TensorBoardLogger
 from torch import nn
 from torch.optim import Adam
 from torch.utils.data import DataLoader, Dataset
-import numpy as np
 
 
 class Attention(nn.Module):

@@ -1,21 +1,15 @@
 import argparse
-from utils import *
-from torch.autograd import Variable
 
+import matplotlib.pyplot as plt
+import numpy as np
+import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.optim as optim
 import torch.utils.data
-from torch.utils.data import TensorDataset, DataLoader
-
-import torch
-import torch.optim as optim
 from torch.autograd import Variable
-import numpy as np
-import matplotlib.pyplot as plt
-
-import numpy as np
-import torch
+from torch.utils.data import DataLoader, TensorDataset
+from utils import *
 
 
 def load_data(base_path):
