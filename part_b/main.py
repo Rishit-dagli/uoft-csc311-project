@@ -161,7 +161,7 @@ class QuestionUserModel(pl.LightningModule):
             optimizer = Adam(self.parameters(), lr=1e-3)
         elif self.optimizer == "lion":
             if torch.cuda.is_available():
-                optimizer = Lion(self.parameters(), lr=1e-3, weight_decay=1e-2, use_triton=True)
+                optimizer = Lion(self.parameters(), lr=1e-5, weight_decay=1e-2, use_triton=True)
             else:
                 optimizer = Lion(self.parameters(), lr=1e-3, weight_decay=1e-2)
         elif self.optimizer == "sgd":
