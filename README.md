@@ -8,6 +8,10 @@ Assuming you have cloned this repository, and you are in the `part_b` directory 
 pip install -r requirements.txt
 ```
 
+## Evaluation code for Part B
+
+All our evaluation code for the models in part A which we use for evaluation in part B resides in the `part_b/evaluate/` directory. Due to size constraints on Markus, we do not include the trained parameters for the random forest model.
+
 ## Training the model
 
 To train the model, you can use the `main.py` script. The script can be used as follows:

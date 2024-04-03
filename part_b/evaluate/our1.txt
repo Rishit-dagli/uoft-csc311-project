@@ -1,0 +1,19 @@
+69.6
+
+Test Accuracy: 0.7061812023708721
+Confusion Matrix:
+[[ 747  685]
+ [ 356 1755]]
+False Positive Rate: 0.47835195530726254
+False Negative Rate: 0.16864045476077688
+True Negative Rate: 0.5216480446927374
+True Positive Rate: 0.8313595452392231
+Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.68      0.52      0.59      1432
+           1       0.72      0.83      0.77      2111
+
+    accuracy                           0.71      3543
+   macro avg       0.70      0.68      0.68      3543
+weighted avg       0.70      0.71      0.70      3543

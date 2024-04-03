@@ -1,0 +1,19 @@
+Best Parameters: Linear Regression has no hyperparameters to tune
+Validation Accuracy: 0.5984334610720897
+Test Accuracy: 0.49026248941574935
+Confusion Matrix:
+[[1035  397]
+ [1409  702]]
+False Positive Rate: 0.2772346368715084
+False Negative Rate: 0.6674561819043108
+True Negative Rate: 0.7227653631284916
+True Positive Rate: 0.3325438180956892
+Classification Report:
+              precision    recall  f1-score   support
+
+           0       0.42      0.72      0.53      1432
+           1       0.64      0.33      0.44      2111
+
+    accuracy                           0.49      3543
+   macro avg       0.53      0.53      0.49      3543
+weighted avg       0.55      0.49      0.48      3543
